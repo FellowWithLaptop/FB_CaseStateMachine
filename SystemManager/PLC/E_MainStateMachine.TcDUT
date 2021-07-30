@@ -1,0 +1,20 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <DUT Name="E_MainStateMachine" Id="{bc461f51-9910-0c15-21e8-451f8e4edb44}">
+    <Declaration><![CDATA[{attribute 'qualified_only'}
+{attribute 'strict'}
+{attribute 'to_string'}
+TYPE E_MainStateMachine :
+(
+	Init := 0,
+    step0,
+    step1,
+    step2,
+    step3,
+    step4,
+    error
+);
+END_TYPE
+]]></Declaration>
+  </DUT>
+</TcPlcObject>

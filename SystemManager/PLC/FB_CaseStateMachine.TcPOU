@@ -1,0 +1,419 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1">
+  <POU Name="FB_CaseStateMachine" Id="{a2f35f24-ee05-03a4-00bf-7802d26fbc80}" SpecialFunc="None">
+    <Declaration><![CDATA[(*
+
+enum : E_AnyEnum;
+fb : FB_StepState('Name',TC_Evetns.Eventclass.Event,enum);
+
+Use the method as Case Variable ->
+CASE fb.CyclicCaseOf(TO_String(enum)) OF
+1: ;
+2: ;
+IF fb.EntryStep THEN
+; // Do Stuff
+END_IF
+
+ELSE ;
+END_CASE
+
+and use the property "State" as your Case variable. Then they can request the property "EntryState" in their step sequence to request the first execution of the step.*)
+{attribute 'no_explicit_call' := 'do not call this POU directly'}
+FUNCTION_BLOCK FB_CaseStateMachine
+VAR
+    {attribute 'hide'}
+    nState : REFERENCE TO INT; //current state
+    {attribute 'hide'}
+    nStateTemp : INT;
+    {attribute 'hide'}
+    bEntryStep : BOOL; //the current state is called the first time
+    {attribute 'hide'}
+    EventEntry : TcEventEntry;
+    {attribute 'hide'}
+    sNameOfTheStateMachine : Tc2_System.T_MaxString; //name of the state machine
+    {attribute 'hide'}
+    sState : Tc2_System.T_MaxString; //name of the current state
+    {attribute 'hide'}
+    nStateAtBeginning : INT; //state of the Beginning of the Cycle
+    {attribute 'hide'}
+    nPreviousState : INT; //previous state
+    {attribute 'hide'}
+    sPreviousState : Tc2_System.T_MaxString;//name of the previous state
+    {attribute 'hide'}
+    bToBeRepeated : BOOL; //case instruction should be repeated in the same cycle
+    {attribute 'hide'}
+    CycleStarted : ULINT; //time when the current condition occurred for the first time
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Folder Name="ChangeState" Id="{216dd0f0-389a-0167-1e4a-d28747968a62}" />
+    <Method Name="ChangeState" Id="{7e3189cd-4ead-0497-054b-adbf08e1fcd0}" FolderPath="ChangeState\">
+      <Declaration><![CDATA[//change the current state
+METHOD PUBLIC ChangeState : HRESULT
+VAR_INPUT
+    nState : INT;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ChangeState := S_OK;
+THIS^.nState := nState;
+bToBeRepeated := FALSE; //dont repeat the case statement]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="ChangeStateAndRepeat" Id="{6bce0eba-cf04-093d-3838-edbb2117b045}" FolderPath="ChangeState\">
+      <Declaration><![CDATA[//change the current state and repeat the case statement in the same cycle.
+METHOD PUBLIC ChangeStateAndRepeat : HRESULT
+VAR_INPUT
+    nState : INT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ChangeStateAndRepeat := S_OK;
+THIS^.nState := nState;
+bToBeRepeated := True; //Repeat the case statement]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="CyclicCase" Id="{6edb90ed-0178-0b0f-1dcd-5c5464212fa3}">
+      <Declaration><![CDATA[(*
+Use the method as Case Variable ->
+CASE fb.CyclicCaseOf(TO_String(enum)) OF
+1: ;
+2: ;
+ELSE ;
+END_CASE
+*)
+
+{attribute 'monitoring':='variable'}
+METHOD PUBLIC CyclicCase : INT
+VAR_INPUT
+    sState : Tc2_System.T_MaxString;//Name of the current state (TO_String(enum))
+END_VAR
+VAR_INST
+    bInit : BOOL := TRUE;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[bEntryStep := (nStateTemp <> nState) OR bInit; //check for change to recognize the entry step
+bToBeRepeated := FALSE; //reset the ToBeRepeated flag
+
+IF bEntryStep THEN
+
+    Logging();
+    
+    // Save PreviousState
+    IF bInit THEN
+        nPreviousState := nState;
+        sPreviousState := sState;
+    ELSE
+        nPreviousState := nStateTemp;
+        sPreviousState := THIS^.sState;
+	END_IF
+    
+    // Save active State
+    nStateTemp := nState;
+    THIS^.sState := sState; //save aktive state string
+    bInit := FALSE;
+    CycleStarted := F_GetSystemTime(); // Save timestamp   
+END_IF
+
+CyclicCase := nState; //return state
+nStateAtBeginning := nState; //save the state at the beginning]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="EntryStep" Id="{aecde489-e26f-053c-2ba6-7e785854d37b}">
+      <Declaration><![CDATA[{attribute 'monitoring':='variable'}
+//the current state is called the first time
+PROPERTY PUBLIC EntryStep : BOOL]]></Declaration>
+      <Get Name="Get" Id="{31791c25-45fa-0fbe-025f-e25e10578495}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[EntryStep := bEntryStep;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="ExitStep" Id="{06bee10a-d217-0ebf-39a4-5e71e0263286}">
+      <Declaration><![CDATA[//the current state is exited now
+PROPERTY PUBLIC ExitStep : BOOL]]></Declaration>
+      <Get Name="Get" Id="{e2772104-2164-0e96-03a9-78a13497d012}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[ExitStep := nStateAtBeginning <> nState;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="FB_init" Id="{93ee3cba-0493-0419-3872-0075c40a1eca}">
+      <Declaration><![CDATA[METHOD FB_init : BOOL
+VAR_INPUT
+    bInitRetains : BOOL; // if TRUE, the retain variables are initialized (warm start / cold start)
+    bInCopyCode : BOOL; // if TRUE, the instance afterwards gets moved into the copy code (online change)
+    sNameOfTheStateMachine : Tc2_System.T_MaxString; //Name of the state machine
+    EventEntry : TcEventEntry; //TwinCAT3 event entry
+    EnumRef : REFERENCE TO INT; //Reference to an enum which represents the states of the state machine.
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.sNameOfTheStateMachine := sNameOfTheStateMachine;
+THIS^.EventEntry := EventEntry;
+THIS^.nState REF= EnumRef;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Logging" Id="{0926a325-9b42-0e4e-1fde-d020230d73c3}">
+      <Declaration><![CDATA[METHOD PROTECTED Logging : HRESULT
+VAR
+    sText : T_MaxString;
+    sOldTime : T_MaxString;
+END_VAR
+VAR_INST
+    {attribute 'tc_no_symbol'}
+    {attribute 'hide'}
+    fbMessage : FB_TcMessage;
+    {attribute 'no_copy'}
+    fbSourceInfo : FB_TcSourceInfo;
+    bInit : BOOL := TRUE;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF bInit THEN
+    fbSourceInfo.ResetToDefault();
+    fbMessage.CreateEx(EventEntry, fbSourceInfo);    
+    bInit := FALSE;
+END_IF
+
+sText := CONCAT('StateMachine: ', (CONCAT(sNameOfTheStateMachine, CONCAT(', State: ', sState))));
+
+IF CycleStarted <> 0 THEN // Add last execution time
+    sOldTime := CONCAT('[Last state: ', THIS^.sState);
+    sOldTime := CONCAT(sOldTime, '(');
+    sOldTime := CONCAT(sOldTime, UlintSystemTimeToTimeString(F_GetSystemTime() - CycleStarted));
+    sOldTime := CONCAT(sOldTime, ')]');
+
+    sText := CONCAT(sText, ' ');
+    sText := CONCAT(sText, sOldTime);
+END_IF
+//Send Message
+fbMessage.ipArguments.Clear().AddString(sText);
+fbMessage.Send(nTimeStamp := 0);]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="NotToBeRepeated" Id="{6294ba6e-5700-0323-0e13-2bc8e0ecba25}">
+      <Declaration><![CDATA[//Case instruction should NOT be repeated in the same cycle
+PROPERTY PUBLIC NotToBeRepeated : BOOL]]></Declaration>
+      <Get Name="Get" Id="{364b1183-af2f-0dd9-305e-cbe77b0290f2}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[NotToBeRepeated := NOT bToBeRepeated;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="PreviousStep" Id="{97b31ccf-e417-0990-0f48-411a3e8b2db8}">
+      <Declaration><![CDATA[{attribute 'monitoring':='call'}
+//previous state
+PROPERTY PUBLIC PreviousStep : INT]]></Declaration>
+      <Get Name="Get" Id="{0f421de9-4766-0458-2f93-bd935534a74b}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[PreviousStep := nPreviousState;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="PreviousStepAsString" Id="{ef36a22c-6010-044e-236c-35240e60f8a4}">
+      <Declaration><![CDATA[{attribute 'monitoring':='call'}
+//previous state as STRING
+PROPERTY PUBLIC PreviousStepAsString : T_MaxString]]></Declaration>
+      <Get Name="Get" Id="{bed6f0a7-6e82-0b12-2026-70510a03b000}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[PreviousStepAsString := sPreviousState;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="State" Id="{f54383b8-7b7d-0e3e-0859-364b0214b175}">
+      <Declaration><![CDATA[{attribute 'monitoring':='call'}
+//current state
+PROPERTY PUBLIC State : INT]]></Declaration>
+      <Get Name="Get" Id="{b9d257dc-27f6-07a1-2a73-4d6da2f8acdc}">
+        <Declaration><![CDATA[VAR
+END_VAR
+]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[State := nState;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="StateAsString" Id="{bc0efb67-09ba-0742-14bb-a042c47fce66}">
+      <Declaration><![CDATA[{attribute 'monitoring':='variable'}
+//name of the current state
+PROPERTY PUBLIC StateAsString : T_MaxString]]></Declaration>
+      <Get Name="Get" Id="{8cf705b9-3d05-0021-3593-f5ed71b3b91c}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[StateAsString := sState;]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Property Name="t" Id="{c5da1385-4820-0c98-129a-83c8a059ceaa}">
+      <Declaration><![CDATA[{attribute 'monitoring':='call'}
+//Time spent in current state
+PROPERTY PUBLIC t : TIME]]></Declaration>
+      <Get Name="Get" Id="{3ad93f29-30dc-06fd-33e9-00f2d27790b5}">
+        <Declaration><![CDATA[VAR
+END_VAR]]></Declaration>
+        <Implementation>
+          <ST><![CDATA[t := ULINT_TO_TIME((F_GetSystemTime() - CycleStarted) / 10000);]]></ST>
+        </Implementation>
+      </Get>
+    </Property>
+    <Method Name="TransChangeState" Id="{4ccfca7a-0034-0db2-2899-30508be28571}" FolderPath="ChangeState\">
+      <Declaration><![CDATA[//change the current state as soon as the transition becomes TRUE
+METHOD PUBLIC TransChangeState : HRESULT
+VAR_INPUT
+    nState : INT;
+    bTransition : BOOL;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TransChangeState := S_PENDING;
+IF bTransition THEN
+    THIS^.nState := nState;
+    TransChangeState := S_OK;
+    bToBeRepeated := FALSE; //dont repeat the case statement
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="TransChangeStateAndRepeat" Id="{cb5cc672-e18e-099b-1f7a-6a85a3d2059d}" FolderPath="ChangeState\">
+      <Declaration><![CDATA[//change the current state if the transition is true, and repeat the case statement in the same cycle.
+METHOD TransChangeStateAndRepeat : HRESULT
+VAR_INPUT
+    nState : INT;
+    bTransition : BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[TransChangeStateAndRepeat := S_PENDING;
+IF bTransition THEN
+    THIS^.nState := nState;
+    TransChangeStateAndRepeat := S_OK;
+    bToBeRepeated := TRUE; //Repeat the case statement
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="UlintSystemTimeToTimeString" Id="{d452022c-ab50-0638-2061-ea751c9e5c9d}">
+      <Declaration><![CDATA[METHOD PROTECTED UlintSystemTimeToTimeString : Tc2_System.T_MaxString
+VAR_INPUT
+    _fileTime : ULINT;
+END_VAR
+VAR
+    nDiff : ULINT;
+    nRest : ULINT;
+    nStunden : ULINT;
+    nMinuten : ULINT;
+    nSekunden : ULINT;
+    nMillisekunden : ULINT;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[//I know. I know. Magic numbers I know... Do better!!! And dont call me
+
+nRest := _fileTime MOD 36000000000;
+nStunden := (_fileTime - nRest) / 36000000000;
+nDiff := nRest;
+
+nRest := (nDiff MOD 600000000);
+nMinuten := (nDiff - nRest) / 600000000;
+nDiff := nRest;
+
+nRest := (nDiff MOD 10000000);
+nSekunden := (nDiff - nRest) / 10000000;
+nDiff := nRest;
+
+nRest := (nDiff MOD 10000);
+nMillisekunden := (nDiff - nRest) / 10000;
+nDiff := nRest;
+
+IF nStunden > 0 THEN
+    UlintSystemTimeToTimeString := CONCAT(TO_STRING(nStunden), 'h');
+    UlintSystemTimeToTimeString := CONCAT(UlintSystemTimeToTimeString, CONCAT(TO_STRING(nMinuten), 'm'));
+    UlintSystemTimeToTimeString := CONCAT(UlintSystemTimeToTimeString, CONCAT(TO_STRING(nSekunden), 's'));
+    UlintSystemTimeToTimeString := CONCAT(UlintSystemTimeToTimeString, CONCAT(TO_STRING(nMillisekunden), 'ms'));
+ELSIF nMinuten > 0 THEN
+    UlintSystemTimeToTimeString := CONCAT(TO_STRING(nMinuten), 'm');
+    UlintSystemTimeToTimeString := CONCAT(UlintSystemTimeToTimeString, CONCAT(TO_STRING(nSekunden), 's'));
+    UlintSystemTimeToTimeString := CONCAT(UlintSystemTimeToTimeString, CONCAT(TO_STRING(nMillisekunden), 'ms'));
+ELSIF nSekunden > 0 THEN
+    UlintSystemTimeToTimeString := CONCAT(TO_STRING(nSekunden), 's');
+    UlintSystemTimeToTimeString := CONCAT(UlintSystemTimeToTimeString, CONCAT(TO_STRING(nMillisekunden), 'ms'));
+ELSE
+    UlintSystemTimeToTimeString := CONCAT(TO_STRING(nMillisekunden), 'ms');
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="FB_CaseStateMachine">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CaseStateMachine.ChangeState">
+      <LineId Id="3" Count="1" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CaseStateMachine.ChangeStateAndRepeat">
+      <LineId Id="3" Count="1" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CaseStateMachine.CyclicCase">
+      <LineId Id="3" Count="23" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CaseStateMachine.EntryStep.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CaseStateMachine.ExitStep.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CaseStateMachine.FB_init">
+      <LineId Id="3" Count="1" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CaseStateMachine.Logging">
+      <LineId Id="3" Count="18" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CaseStateMachine.NotToBeRepeated.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CaseStateMachine.PreviousStep.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CaseStateMachine.PreviousStepAsString.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CaseStateMachine.State.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CaseStateMachine.StateAsString.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CaseStateMachine.t.Get">
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CaseStateMachine.TransChangeState">
+      <LineId Id="3" Count="4" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CaseStateMachine.TransChangeStateAndRepeat">
+      <LineId Id="3" Count="4" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_CaseStateMachine.UlintSystemTimeToTimeString">
+      <LineId Id="3" Count="31" />
+      <LineId Id="2" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>
