@@ -118,3 +118,9 @@ REPEAT
       
 UNTIL fbState.NotToBeRepeated AND TRUE END_REPEAT
 ```
+
+While executing the code, the current state and the execution time of the previous step is logged.
+Note that step 2 and 3 were executed in one cycle and therefore the execution time is less than the cycle time.
+
+![alt text](https://github.com/FellowWithLaptop/FB_CaseStateMachine/blob/4897f6d4fc89761bb30042eedbef254c7fd7f920/LoggedEvents.png?raw=true)
+
