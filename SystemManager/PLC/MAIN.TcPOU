@@ -103,6 +103,11 @@ REPEAT
         E_MainStateMachine.error:
     
             fbState.TransChangeState(E_MainStateMachine.Init, NOT bError);
+        ELSE
+            (*Always use an Else branch in case something does go wrong ;)
+
+            Todo : Perform error handling here*)
+            fbState.ChangeState(E_MainStateMachine.Init);
     END_CASE
     
  (*This checks whether the case statement needs to be executed again.
@@ -110,42 +115,5 @@ REPEAT
    Otherwise no Brakepoints are possible.*)   
 UNTIL fbState.NotToBeRepeated AND TRUE END_REPEAT]]></ST>
     </Implementation>
-    <LineIds Name="MAIN">
-      <LineId Id="190" Count="1" />
-      <LineId Id="113" Count="0" />
-      <LineId Id="192" Count="0" />
-      <LineId Id="114" Count="0" />
-      <LineId Id="193" Count="0" />
-      <LineId Id="115" Count="2" />
-      <LineId Id="194" Count="0" />
-      <LineId Id="118" Count="10" />
-      <LineId Id="195" Count="0" />
-      <LineId Id="129" Count="6" />
-      <LineId Id="201" Count="0" />
-      <LineId Id="197" Count="0" />
-      <LineId Id="136" Count="0" />
-      <LineId Id="213" Count="0" />
-      <LineId Id="138" Count="6" />
-      <LineId Id="146" Count="5" />
-      <LineId Id="154" Count="2" />
-      <LineId Id="200" Count="0" />
-      <LineId Id="157" Count="0" />
-      <LineId Id="199" Count="0" />
-      <LineId Id="158" Count="6" />
-      <LineId Id="212" Count="0" />
-      <LineId Id="165" Count="0" />
-      <LineId Id="202" Count="1" />
-      <LineId Id="166" Count="1" />
-      <LineId Id="169" Count="1" />
-      <LineId Id="172" Count="4" />
-      <LineId Id="204" Count="1" />
-      <LineId Id="178" Count="2" />
-      <LineId Id="211" Count="0" />
-      <LineId Id="181" Count="0" />
-      <LineId Id="184" Count="5" />
-      <LineId Id="210" Count="0" />
-      <LineId Id="207" Count="2" />
-      <LineId Id="2" Count="0" />
-    </LineIds>
   </POU>
 </TcPlcObject>
