@@ -110,6 +110,10 @@ REPEAT
         E_MainStateMachine.error:
     
             fbState.TransChangeState(E_MainStateMachine.Init, NOT bError);
+        ELSE
+            (*Always use an Else branch in case something does go wrong ;)
+            Todo : Perform error handling here*)
+            fbState.ChangeState(E_MainStateMachine.Init);    
     END_CASE
     
  (*This checks whether the case statement needs to be executed again.
