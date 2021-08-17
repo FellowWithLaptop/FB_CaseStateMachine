@@ -99,7 +99,6 @@ bToBeRepeated := FALSE; //reset the ToBeRepeated flag
 
 IF bEntryStep THEN
 
-    Logging();
     
     // Save PreviousState
     IF bInit THEN
@@ -113,6 +112,7 @@ IF bEntryStep THEN
     // Save active State
     nStateTemp := nState;
     THIS^.sState := sState; //save aktive state string
+    Logging(); //Logging after the new state has been adopted
     bInit := FALSE;
     CycleStarted := F_GetSystemTime(); // Save timestamp   
 END_IF
@@ -183,10 +183,10 @@ END_VAR]]></Declaration>
     bInit := FALSE;
 END_IF
 
-sText := CONCAT('StateMachine: ', (CONCAT(sNameOfTheStateMachine, CONCAT(', State: ', sState))));
+sText := CONCAT('StateMachine: ', (CONCAT(sNameOfTheStateMachine, CONCAT(', State: ', StateAsString)))); //name of the current step
 
 IF CycleStarted <> 0 THEN // Add last execution time
-    sOldTime := CONCAT('[Last state: ', THIS^.sState);
+    sOldTime := CONCAT('[Last state: ', PreviousStepAsString); //name of the previous step
     sOldTime := CONCAT(sOldTime, '(');
     sOldTime := CONCAT(sOldTime, UlintSystemTimeToTimeString(F_GetSystemTime() - CycleStarted));
     sOldTime := CONCAT(sOldTime, ')]');
@@ -356,64 +356,5 @@ ELSE
 END_IF]]></ST>
       </Implementation>
     </Method>
-    <LineIds Name="FB_CaseStateMachine">
-      <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_CaseStateMachine.ChangeState">
-      <LineId Id="3" Count="1" />
-      <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_CaseStateMachine.ChangeStateAndRepeat">
-      <LineId Id="3" Count="1" />
-      <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_CaseStateMachine.CyclicCase">
-      <LineId Id="3" Count="23" />
-      <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_CaseStateMachine.EntryStep.Get">
-      <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_CaseStateMachine.ExitStep.Get">
-      <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_CaseStateMachine.FB_init">
-      <LineId Id="3" Count="1" />
-      <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_CaseStateMachine.Logging">
-      <LineId Id="3" Count="18" />
-      <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_CaseStateMachine.NotToBeRepeated.Get">
-      <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_CaseStateMachine.PreviousStep.Get">
-      <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_CaseStateMachine.PreviousStepAsString.Get">
-      <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_CaseStateMachine.State.Get">
-      <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_CaseStateMachine.StateAsString.Get">
-      <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_CaseStateMachine.t.Get">
-      <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_CaseStateMachine.TransChangeState">
-      <LineId Id="3" Count="4" />
-      <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_CaseStateMachine.TransChangeStateAndRepeat">
-      <LineId Id="3" Count="4" />
-      <LineId Id="2" Count="0" />
-    </LineIds>
-    <LineIds Name="FB_CaseStateMachine.UlintSystemTimeToTimeString">
-      <LineId Id="3" Count="31" />
-      <LineId Id="2" Count="0" />
-    </LineIds>
   </POU>
 </TcPlcObject>
