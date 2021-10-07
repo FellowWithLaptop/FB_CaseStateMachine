@@ -12,6 +12,7 @@ TYPE E_MainStateMachine :
     step2,
     step3,
     step4,
+    TipStep,
     error
 );
 END_TYPE

@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <TcPlcObject Version="1.1.0.1">
-  <POU Name="FB_CaseStateMachine" Id="{a2f35f24-ee05-03a4-00bf-7802d26fbc80}" SpecialFunc="None">
+  <POU Name="FB_CaseStateMachine" Id="{95eec410-01ac-4868-a5c1-70e8b0cabc39}" SpecialFunc="None">
     <Declaration><![CDATA[(*
 
 enum : E_AnyEnum;
@@ -24,6 +24,8 @@ VAR
     {attribute 'hide'}
     nState : REFERENCE TO INT; //current state
     {attribute 'hide'}
+    nNextStep : INT; //current state
+    {attribute 'hide'}
     nStateTemp : INT;
     {attribute 'hide'}
     bEntryStep : BOOL; //the current state is called the first time
@@ -43,13 +45,19 @@ VAR
     bToBeRepeated : BOOL; //case instruction should be repeated in the same cycle
     {attribute 'hide'}
     CycleStarted : ULINT; //time when the current condition occurred for the first time
+    {attribute 'hide'}
+    bEnabledTipMode : BOOL;
+    {attribute 'hide'}
+    nTipModeState : INT;
 END_VAR
 ]]></Declaration>
     <Implementation>
       <ST><![CDATA[]]></ST>
     </Implementation>
-    <Folder Name="ChangeState" Id="{216dd0f0-389a-0167-1e4a-d28747968a62}" />
-    <Method Name="ChangeState" Id="{7e3189cd-4ead-0497-054b-adbf08e1fcd0}" FolderPath="ChangeState\">
+    <Folder Name="ChangeState" Id="{16704bc4-d733-4aab-bb34-da6d25338adb}" />
+    <Folder Name="Event" Id="{1f32253d-54c2-4938-aa13-d57131d35b3b}" />
+    <Folder Name="TipMode" Id="{c15f14f4-18a7-4d96-95b0-0b27b6ef01a2}" />
+    <Method Name="ChangeState" Id="{492c12f9-a104-4f5b-a035-a5556a44fc69}" FolderPath="ChangeState\">
       <Declaration><![CDATA[//change the current state
 METHOD PUBLIC ChangeState : HRESULT
 VAR_INPUT
@@ -58,11 +66,12 @@ END_VAR
 ]]></Declaration>
       <Implementation>
         <ST><![CDATA[ChangeState := S_OK;
-THIS^.nState := nState;
-bToBeRepeated := FALSE; //dont repeat the case statement]]></ST>
+THIS^.nNextStep := nState;
+bToBeRepeated := FALSE; //dont repeat the case statement
+TipModeLogic();]]></ST>
       </Implementation>
     </Method>
-    <Method Name="ChangeStateAndRepeat" Id="{6bce0eba-cf04-093d-3838-edbb2117b045}" FolderPath="ChangeState\">
+    <Method Name="ChangeStateAndRepeat" Id="{5cd3958e-20ad-42f1-9d46-e55143b2b0fc}" FolderPath="ChangeState\">
       <Declaration><![CDATA[//change the current state and repeat the case statement in the same cycle.
 METHOD PUBLIC ChangeStateAndRepeat : HRESULT
 VAR_INPUT
@@ -70,11 +79,12 @@ VAR_INPUT
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[ChangeStateAndRepeat := S_OK;
-THIS^.nState := nState;
-bToBeRepeated := True; //Repeat the case statement]]></ST>
+THIS^.nNextStep := nState;
+bToBeRepeated := TRUE; //Repeat the case statement
+TipModeLogic();]]></ST>
       </Implementation>
     </Method>
-    <Method Name="CyclicCase" Id="{6edb90ed-0178-0b0f-1dcd-5c5464212fa3}">
+    <Method Name="CyclicCase" Id="{59c60bd9-eed1-40c3-b8b3-54be06842f1a}">
       <Declaration><![CDATA[(*
 Use the method as Case Variable ->
 CASE fb.CyclicCaseOf(TO_String(enum)) OF
@@ -121,11 +131,23 @@ CyclicCase := nState; //return state
 nStateAtBeginning := nState; //save the state at the beginning]]></ST>
       </Implementation>
     </Method>
-    <Property Name="EntryStep" Id="{aecde489-e26f-053c-2ba6-7e785854d37b}">
+    <Method Name="EnableTipMode" Id="{f981a32b-5880-4f02-a564-568985d96ec1}" FolderPath="TipMode\">
+      <Declaration><![CDATA[METHOD PUBLIC EnableTipMode : HRESULT
+VAR_INPUT
+    bEnable : BOOL;
+    nTipModeState : INT; //The state to jump to when the step chain is in TipMode.
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[THIS^.bEnabledTipMode := bEnable;
+THIS^.nTipModeState := nTipModeState;]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="EntryStep" Id="{99d07fbd-0dc6-4ef0-8ed8-76923af1d3c2}">
       <Declaration><![CDATA[{attribute 'monitoring':='variable'}
 //the current state is called the first time
 PROPERTY PUBLIC EntryStep : BOOL]]></Declaration>
-      <Get Name="Get" Id="{31791c25-45fa-0fbe-025f-e25e10578495}">
+      <Get Name="Get" Id="{06648711-aa53-4472-a721-eab472f2842c}">
         <Declaration><![CDATA[VAR
 END_VAR
 ]]></Declaration>
@@ -134,10 +156,10 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
-    <Property Name="ExitStep" Id="{06bee10a-d217-0ebf-39a4-5e71e0263286}">
+    <Property Name="ExitStep" Id="{31a37a3e-3dbe-4573-9cda-569b8283323f}">
       <Declaration><![CDATA[//the current state is exited now
 PROPERTY PUBLIC ExitStep : BOOL]]></Declaration>
-      <Get Name="Get" Id="{e2772104-2164-0e96-03a9-78a13497d012}">
+      <Get Name="Get" Id="{d56aba30-cecd-455a-a6d7-704b5632d0ab}">
         <Declaration><![CDATA[VAR
 END_VAR
 ]]></Declaration>
@@ -146,23 +168,23 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
-    <Method Name="FB_init" Id="{93ee3cba-0493-0419-3872-0075c40a1eca}">
+    <Method Name="FB_init" Id="{a4f3a78e-eb3a-4fd5-9d0c-089fa6af1e73}">
       <Declaration><![CDATA[METHOD FB_init : BOOL
 VAR_INPUT
     bInitRetains : BOOL; // if TRUE, the retain variables are initialized (warm start / cold start)
     bInCopyCode : BOOL; // if TRUE, the instance afterwards gets moved into the copy code (online change)
     sNameOfTheStateMachine : Tc2_System.T_MaxString; //Name of the state machine
     EventEntry : TcEventEntry; //TwinCAT3 event entry
-    EnumRef : REFERENCE TO INT; //Reference to an enum which represents the states of the state machine.
-END_VAR
-]]></Declaration>
+    EnumRef : REFERENCE TO INT; //Reference to an enum which represents the states of the state machine.    
+END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[THIS^.sNameOfTheStateMachine := sNameOfTheStateMachine;
 THIS^.EventEntry := EventEntry;
-THIS^.nState REF= EnumRef;]]></ST>
+THIS^.nState REF= EnumRef;
+THIS^.nNextStep := nState;]]></ST>
       </Implementation>
     </Method>
-    <Method Name="Logging" Id="{0926a325-9b42-0e4e-1fde-d020230d73c3}">
+    <Method Name="Logging" Id="{3e3b3811-74eb-4582-baa0-d8ca41a8737a}">
       <Declaration><![CDATA[METHOD PROTECTED Logging : HRESULT
 VAR
     sText : T_MaxString;
@@ -199,10 +221,10 @@ fbMessage.ipArguments.Clear().AddString(sText);
 fbMessage.Send(nTimeStamp := 0);]]></ST>
       </Implementation>
     </Method>
-    <Property Name="NotToBeRepeated" Id="{6294ba6e-5700-0323-0e13-2bc8e0ecba25}">
+    <Property Name="NotToBeRepeated" Id="{5589215a-b8a9-48ef-ab6d-23228249ba9c}">
       <Declaration><![CDATA[//Case instruction should NOT be repeated in the same cycle
 PROPERTY PUBLIC NotToBeRepeated : BOOL]]></Declaration>
-      <Get Name="Get" Id="{364b1183-af2f-0dd9-305e-cbe77b0290f2}">
+      <Get Name="Get" Id="{01568ab7-4086-4615-9520-c30d19a7904b}">
         <Declaration><![CDATA[VAR
 END_VAR
 ]]></Declaration>
@@ -211,11 +233,11 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
-    <Property Name="PreviousStep" Id="{97b31ccf-e417-0990-0f48-411a3e8b2db8}">
+    <Property Name="PreviousStep" Id="{a0ae87fb-0bbe-425c-aa36-49f05c2e2d01}">
       <Declaration><![CDATA[{attribute 'monitoring':='call'}
 //previous state
 PROPERTY PUBLIC PreviousStep : INT]]></Declaration>
-      <Get Name="Get" Id="{0f421de9-4766-0458-2f93-bd935534a74b}">
+      <Get Name="Get" Id="{385f86dd-a8cf-4f94-8aed-b5793791a7f2}">
         <Declaration><![CDATA[VAR
 END_VAR
 ]]></Declaration>
@@ -224,11 +246,11 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
-    <Property Name="PreviousStepAsString" Id="{ef36a22c-6010-044e-236c-35240e60f8a4}">
+    <Property Name="PreviousStepAsString" Id="{d82b3918-8fb9-4f82-8612-3dce6cc5f81d}">
       <Declaration><![CDATA[{attribute 'monitoring':='call'}
 //previous state as STRING
 PROPERTY PUBLIC PreviousStepAsString : T_MaxString]]></Declaration>
-      <Get Name="Get" Id="{bed6f0a7-6e82-0b12-2026-70510a03b000}">
+      <Get Name="Get" Id="{89cb6b93-812b-40de-8558-78bb68a6b0b9}">
         <Declaration><![CDATA[VAR
 END_VAR
 ]]></Declaration>
@@ -237,11 +259,44 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
-    <Property Name="State" Id="{f54383b8-7b7d-0e3e-0859-364b0214b175}">
+    <Method Name="SendEvent" Id="{baf2e7a3-b537-0542-0e23-c2bee2cbd933}" FolderPath="Event\">
+      <Declaration><![CDATA[METHOD PUBLIC SendEvent : HRESULT
+VAR_INPUT
+	sText: STRING(255);
+	sExtendsSourceInfo: STRING(255);
+END_VAR
+VAR_INST
+    {attribute 'tc_no_symbol'}
+    {attribute 'hide'}
+    fbMessage : FB_TcMessage;
+    {attribute 'no_copy'}
+    fbSourceInfo : FB_TcSourceInfo;
+    bInit : BOOL := TRUE;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF bInit THEN
+    fbSourceInfo.ResetToDefault();
+    fbMessage.CreateEx(EventEntry, fbSourceInfo);    
+    bInit := FALSE;
+END_IF
+
+
+IF sExtendsSourceInfo <> '' THEN    
+    fbSourceInfo.ExtendName(sExtendsSourceInfo);
+END_IF
+    fbMessage.ipArguments.Clear().AddString(sText);
+    fbMessage.Send(nTimeStamp := 0);
+
+IF sExtendsSourceInfo <> '' THEN
+    fbSourceInfo.ResetToDefault();
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Property Name="State" Id="{c25e188c-94d4-45f2-ad27-3ea160b1b1cc}">
       <Declaration><![CDATA[{attribute 'monitoring':='call'}
 //current state
 PROPERTY PUBLIC State : INT]]></Declaration>
-      <Get Name="Get" Id="{b9d257dc-27f6-07a1-2a73-4d6da2f8acdc}">
+      <Get Name="Get" Id="{8ecfcce8-c85f-4c6d-8f0d-4587c05dac65}">
         <Declaration><![CDATA[VAR
 END_VAR
 ]]></Declaration>
@@ -250,11 +305,11 @@ END_VAR
         </Implementation>
       </Get>
     </Property>
-    <Property Name="StateAsString" Id="{bc0efb67-09ba-0742-14bb-a042c47fce66}">
+    <Property Name="StateAsString" Id="{8b136053-e613-4c8e-b1c5-a8a8a6dacedf}">
       <Declaration><![CDATA[{attribute 'monitoring':='variable'}
 //name of the current state
 PROPERTY PUBLIC StateAsString : T_MaxString]]></Declaration>
-      <Get Name="Get" Id="{8cf705b9-3d05-0021-3593-f5ed71b3b91c}">
+      <Get Name="Get" Id="{bbea9e8d-d2ac-4bed-90ed-fd071316b9a5}">
         <Declaration><![CDATA[VAR
 END_VAR]]></Declaration>
         <Implementation>
@@ -262,11 +317,11 @@ END_VAR]]></Declaration>
         </Implementation>
       </Get>
     </Property>
-    <Property Name="t" Id="{c5da1385-4820-0c98-129a-83c8a059ceaa}">
+    <Property Name="t" Id="{f2c788b1-a789-4754-b7e4-8b22c2fcce13}">
       <Declaration><![CDATA[{attribute 'monitoring':='call'}
 //Time spent in current state
 PROPERTY PUBLIC t : TIME]]></Declaration>
-      <Get Name="Get" Id="{3ad93f29-30dc-06fd-33e9-00f2d27790b5}">
+      <Get Name="Get" Id="{0dc4a41d-df75-4d31-9697-0818b0d2900c}">
         <Declaration><![CDATA[VAR
 END_VAR]]></Declaration>
         <Implementation>
@@ -274,7 +329,35 @@ END_VAR]]></Declaration>
         </Implementation>
       </Get>
     </Property>
-    <Method Name="TransChangeState" Id="{4ccfca7a-0034-0db2-2899-30508be28571}" FolderPath="ChangeState\">
+    <Method Name="TipModeAllowNextStep" Id="{64c9b7ce-bcc7-07c2-327c-77756233342e}" FolderPath="TipMode\">
+      <Declaration><![CDATA[METHOD PUBLIC TipModeAllowNextStep : HRESULT
+VAR_INPUT
+    bTransition : BOOL;
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF bTransition THEN
+    nState := nNextStep;       
+END_IF
+TipModeAllowNextStep := Tc3_Module.S_OK;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="TipModeLogic" Id="{759069cc-303e-0a30-1f64-08903b7f5760}" FolderPath="TipMode\">
+      <Declaration><![CDATA[METHOD PROTECTED TipModeLogic : HRESULT
+VAR_INPUT
+END_VAR
+]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[(*If TipMode is not active, the new step is applied immediately.*)
+IF NOT bEnabledTipMode THEN
+    nState := nNextStep;
+ELSE
+    nState := nTipModeState;
+END_IF
+TipModeLogic := Tc3_Module.S_OK;]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="TransChangeState" Id="{7bd2514e-ef9d-467e-8de7-38bae94785c8}" FolderPath="ChangeState\">
       <Declaration><![CDATA[//change the current state as soon as the transition becomes TRUE
 METHOD PUBLIC TransChangeState : HRESULT
 VAR_INPUT
@@ -284,13 +367,14 @@ END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[TransChangeState := S_PENDING;
 IF bTransition THEN
-    THIS^.nState := nState;
+    THIS^.nNextStep := nState;
     TransChangeState := S_OK;
     bToBeRepeated := FALSE; //dont repeat the case statement
+    TipModeLogic();
 END_IF]]></ST>
       </Implementation>
     </Method>
-    <Method Name="TransChangeStateAndRepeat" Id="{cb5cc672-e18e-099b-1f7a-6a85a3d2059d}" FolderPath="ChangeState\">
+    <Method Name="TransChangeStateAndRepeat" Id="{fc415d46-0e27-4257-ba04-626fc1770524}" FolderPath="ChangeState\">
       <Declaration><![CDATA[//change the current state if the transition is true, and repeat the case statement in the same cycle.
 METHOD TransChangeStateAndRepeat : HRESULT
 VAR_INPUT
@@ -301,13 +385,35 @@ END_VAR
       <Implementation>
         <ST><![CDATA[TransChangeStateAndRepeat := S_PENDING;
 IF bTransition THEN
-    THIS^.nState := nState;
+    THIS^.nNextStep := nState;
     TransChangeStateAndRepeat := S_OK;
     bToBeRepeated := TRUE; //Repeat the case statement
+    TipModeLogic();
 END_IF]]></ST>
       </Implementation>
     </Method>
-    <Method Name="UlintSystemTimeToTimeString" Id="{d452022c-ab50-0638-2061-ea751c9e5c9d}">
+    <Method Name="TransSendEvent" Id="{96b6cfb3-530a-0cc1-3ec2-6ba03f1f9c6a}" FolderPath="Event\">
+      <Declaration><![CDATA[METHOD PUBLIC TransSendEvent : HRESULT
+VAR_INPUT
+	sText: STRING(255);
+	sExtendsSourceInfo: STRING(255);
+    bTransition : BOOL;
+END_VAR
+VAR_INST
+    {attribute 'tc_no_symbol'}
+    {attribute 'hide'}
+    fbMessage : FB_TcMessage;
+    {attribute 'no_copy'}
+    fbSourceInfo : FB_TcSourceInfo;
+    bInit : BOOL := TRUE;
+END_VAR]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[IF bTransition THEN
+    SendEvent(sExtendsSourceInfo := sExtendsSourceInfo, sText := sText);
+END_IF]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="UlintSystemTimeToTimeString" Id="{e34f9918-44f9-4df4-851f-e29f7e3b5c24}">
       <Declaration><![CDATA[METHOD PROTECTED UlintSystemTimeToTimeString : Tc2_System.T_MaxString
 VAR_INPUT
     _fileTime : ULINT;
