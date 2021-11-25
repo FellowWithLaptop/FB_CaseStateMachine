@@ -124,7 +124,7 @@ IF bEntryStep THEN
     THIS^.sState := sState; //save aktive state string
     Logging(); //Logging after the new state has been adopted
     bInit := FALSE;
-    CycleStarted := F_GetSystemTime(); // Save timestamp   
+    CycleStarted := F_GetActualDcTime64(); // Save timestamp   
 END_IF
 
 CyclicCase := nState; //return state
@@ -197,6 +197,7 @@ VAR_INST
     {attribute 'no_copy'}
     fbSourceInfo : FB_TcSourceInfo;
     bInit : BOOL := TRUE;
+    sDifTime : STRING;
 END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[IF bInit THEN
@@ -210,7 +211,8 @@ sText := CONCAT('StateMachine: ', (CONCAT(sNameOfTheStateMachine, CONCAT(', Stat
 IF CycleStarted <> 0 THEN // Add last execution time
     sOldTime := CONCAT('[Last state: ', PreviousStepAsString); //name of the previous step
     sOldTime := CONCAT(sOldTime, '(');
-    sOldTime := CONCAT(sOldTime, UlintSystemTimeToTimeString(F_GetSystemTime() - CycleStarted));
+    sDifTime := DELETE (LTIME_TO_STRING( ULINT_TO_LTIME(F_GetActualDcTime64() - CycleStarted)), 6,1);
+    sOldTime := CONCAT(sOldTime, sDifTime);
     sOldTime := CONCAT(sOldTime, ')]');
 
     sText := CONCAT(sText, ' ');
@@ -410,55 +412,6 @@ END_VAR]]></Declaration>
       <Implementation>
         <ST><![CDATA[IF bTransition THEN
     SendEvent(sExtendsSourceInfo := sExtendsSourceInfo, sText := sText);
-END_IF]]></ST>
-      </Implementation>
-    </Method>
-    <Method Name="UlintSystemTimeToTimeString" Id="{e34f9918-44f9-4df4-851f-e29f7e3b5c24}">
-      <Declaration><![CDATA[METHOD PROTECTED UlintSystemTimeToTimeString : Tc2_System.T_MaxString
-VAR_INPUT
-    _fileTime : ULINT;
-END_VAR
-VAR
-    nDiff : ULINT;
-    nRest : ULINT;
-    nStunden : ULINT;
-    nMinuten : ULINT;
-    nSekunden : ULINT;
-    nMillisekunden : ULINT;
-END_VAR]]></Declaration>
-      <Implementation>
-        <ST><![CDATA[//I know. I know. Magic numbers I know... Do better!!! And dont call me
-
-nRest := _fileTime MOD 36000000000;
-nStunden := (_fileTime - nRest) / 36000000000;
-nDiff := nRest;
-
-nRest := (nDiff MOD 600000000);
-nMinuten := (nDiff - nRest) / 600000000;
-nDiff := nRest;
-
-nRest := (nDiff MOD 10000000);
-nSekunden := (nDiff - nRest) / 10000000;
-nDiff := nRest;
-
-nRest := (nDiff MOD 10000);
-nMillisekunden := (nDiff - nRest) / 10000;
-nDiff := nRest;
-
-IF nStunden > 0 THEN
-    UlintSystemTimeToTimeString := CONCAT(TO_STRING(nStunden), 'h');
-    UlintSystemTimeToTimeString := CONCAT(UlintSystemTimeToTimeString, CONCAT(TO_STRING(nMinuten), 'm'));
-    UlintSystemTimeToTimeString := CONCAT(UlintSystemTimeToTimeString, CONCAT(TO_STRING(nSekunden), 's'));
-    UlintSystemTimeToTimeString := CONCAT(UlintSystemTimeToTimeString, CONCAT(TO_STRING(nMillisekunden), 'ms'));
-ELSIF nMinuten > 0 THEN
-    UlintSystemTimeToTimeString := CONCAT(TO_STRING(nMinuten), 'm');
-    UlintSystemTimeToTimeString := CONCAT(UlintSystemTimeToTimeString, CONCAT(TO_STRING(nSekunden), 's'));
-    UlintSystemTimeToTimeString := CONCAT(UlintSystemTimeToTimeString, CONCAT(TO_STRING(nMillisekunden), 'ms'));
-ELSIF nSekunden > 0 THEN
-    UlintSystemTimeToTimeString := CONCAT(TO_STRING(nSekunden), 's');
-    UlintSystemTimeToTimeString := CONCAT(UlintSystemTimeToTimeString, CONCAT(TO_STRING(nMillisekunden), 'ms'));
-ELSE
-    UlintSystemTimeToTimeString := CONCAT(TO_STRING(nMillisekunden), 'ms');
 END_IF]]></ST>
       </Implementation>
     </Method>
