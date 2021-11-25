@@ -327,7 +327,7 @@ PROPERTY PUBLIC t : TIME]]></Declaration>
         <Declaration><![CDATA[VAR
 END_VAR]]></Declaration>
         <Implementation>
-          <ST><![CDATA[t := ULINT_TO_TIME((F_GetSystemTime() - CycleStarted) / 10000);]]></ST>
+          <ST><![CDATA[t := LTIME_TO_TIME(ULINT_TO_LTIME((F_GetActualDcTime64() - CycleStarted)));]]></ST>
         </Implementation>
       </Get>
     </Property>
