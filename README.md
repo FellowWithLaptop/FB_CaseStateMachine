@@ -3,16 +3,14 @@
 
 ![alt text](https://github.com/FellowWithLaptop/FB_CaseStateMachine/blob/fbd3ddd37be86def557bec65cdec209f48f872f0/Icon.png?raw=true)
 
-A simple function block to make it easier and clearer to program a state machine in structured text (IEC 61131-3).  If you write your state machine with a CASE instruction and an enum, you might miss functions like an entry and exit step, timeout functions or logging possibilities.  This module should show you how you can implement all these things.  The example was created with TwinCAT and uses the TwinCAT Eventlogger. The basic concept is also possible in Codesys. 
+A simple function block to make it easier and clearer to program a state machine in structured text (IEC 61131-3).  If you write your state machine with a CASE instruction and an enum, you might miss functions like an entry and exit step, tipmode, timeout functions or logging possibilities.  This module should show you how you can implement all these things.  The example was created with TwinCAT and uses the TwinCAT Eventlogger. The basic concept is also possible in Codesys. 
 ``` pascal
 PROGRAM MAIN
 VAR
     // state machine
     eState : E_MainStateMachine;
-    (*The FB_Init method is used to pass the name of the state machine,
-    the event entry and the variable of the state machine*)
-    
-    fbState : FB_CaseStateMachine('MainStateMachine', TC_Events.TcGeneralAdsEventClass.Pending, eState);
+    (*The FB_Init method is used to pass the name of the state machine, the event entry and the variable of the state machine*)
+    fbState : FB_CaseStateMachine('MainStateMachine', TC_Events.TcGeneralAdsEventClass.Pending,eState);
 
     //some transitions
     bInitDone : BOOL;
@@ -22,10 +20,17 @@ VAR
     i : INT;
 
     //Error
-    bError : BOOL;  
+    bError : BOOL;
+
+    //TipMode
+    bEnableTipMode : BOOL;  
+    bTip : BOOL;   
 END_VAR
 ```
 ``` pascal
+(*With the following method, you can switch on the Tip Mode and define the appropriate step.*)
+fbState.EnableTipMode(bEnable := bEnableTipMode, nTipModeState := E_MainStateMachine.TipStep);
+
 (*the case statement is in a repeat loop. If the state is to be changed in the same cycle,
 the repeat loop executes the case statement a second time. Be careful when using this function*)
 REPEAT
@@ -60,7 +65,10 @@ REPEAT
             fbState.TransChangeState(E_MainStateMachine.step1, timertrans1.Q);
             
             fbState.TransChangeState(E_MainStateMachine.error, bError);
-    
+            
+            (*Send events for diagnostic purposes*)
+            fbState.TransSendEvent(sText :='Ups, an error has occurred', sExtendsSourceInfo := '', bTransition := bError);
+            
             IF fbState.ExitStep THEN
                 timertrans1(IN := FALSE);
             END_IF
@@ -110,16 +118,21 @@ REPEAT
         E_MainStateMachine.error:
     
             fbState.TransChangeState(E_MainStateMachine.Init, NOT bError);
+            
+        E_MainStateMachine.TipStep :
+        
+            fbState.TipModeAllowNextStep(bTip);
+            bTip := FALSE;
         ELSE
             (*Always use an Else branch in case something does go wrong ;)
+
             Todo : Perform error handling here*)
-            fbState.ChangeState(E_MainStateMachine.Init);    
+            fbState.ChangeState(E_MainStateMachine.Init);
     END_CASE
     
  (*This checks whether the case statement needs to be executed again.
    Unfortunately there is an error in the compiler which makes it necessary to add an "And True".
-   Otherwise no Brakepoints are possible.*)
-      
+   Otherwise no Brakepoints are possible.*)   
 UNTIL fbState.NotToBeRepeated AND TRUE END_REPEAT
 ```
 
